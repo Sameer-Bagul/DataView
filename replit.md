@@ -6,18 +6,19 @@ A comprehensive market research platform that generates detailed market reports,
 ## Architecture
 - **Frontend**: React with TypeScript, Vite, Tailwind CSS, shadcn/ui components
 - **Backend**: Express.js with TypeScript in MVC architecture
-- **Database**: PostgreSQL with Drizzle ORM
-- **Authentication**: Replit OAuth with session management
+- **Database**: MongoDB with Mongoose ODM
+- **Authentication**: Google OAuth + JWT with session management
 - **Deployment**: Replit hosting
 
 ## Recent Changes (2025-01-28)
 - ✅ Migrated from Replit Agent to standard Replit environment
-- ✅ Implemented OAuth authentication using Replit Auth
+- ✅ Converted entire application from PostgreSQL to MongoDB
+- ✅ Implemented Google OAuth + JWT authentication system
 - ✅ Converted server architecture from simple routes to MVC pattern
-- ✅ Integrated PostgreSQL database replacing in-memory storage
-- ✅ Updated frontend to use Replit Auth (removed custom login/signup)
-- ✅ Created database schema with users, sessions, report_requests, and market_reports tables
-- ✅ Added comprehensive authentication middleware and session management
+- ✅ Integrated MongoDB database with Mongoose ODM
+- ✅ Updated frontend with proper login/register pages and OAuth integration
+- ✅ Created comprehensive MongoDB schema with Users, ReportRequests, and MarketReports collections
+- ✅ Added JWT-based authentication with cookie and header support
 
 ## User Preferences
 - Prefer secure, production-ready authentication over demo credentials
@@ -26,26 +27,26 @@ A comprehensive market research platform that generates detailed market reports,
 - Focus on functionality over excessive customization
 
 ## Key Features
-1. **Replit OAuth Authentication** - Secure authentication with automatic user management
+1. **Google OAuth + JWT Authentication** - Secure authentication with OAuth and local account support
 2. **Market Report Generation** - AI-powered comprehensive market research reports
-3. **Database Integration** - PostgreSQL with proper schema and relationships
-4. **MVC Architecture** - Organized server structure with controllers and models
-5. **Professional UI** - Clean, responsive interface with shadcn/ui components
+3. **MongoDB Integration** - NoSQL database with Mongoose ODM and proper schema validation
+4. **MVC Architecture** - Organized server structure with controllers, authentication middleware, and models
+5. **Professional UI** - Clean, responsive interface with shadcn/ui components and modern auth flows
 
-## Database Schema
-- **users**: Replit Auth user profiles (id, email, firstName, lastName, profileImageUrl)
-- **sessions**: Session storage for authentication
-- **report_requests**: User report generation requests
-- **market_reports**: Generated market research reports with comprehensive data
+## Database Schema (MongoDB Collections)
+- **users**: User profiles with OAuth and local auth support (id, email, firstName, lastName, profileImageUrl, password, oauthProvider, oauthId)
+- **reportrequests**: User report generation requests with status tracking
+- **marketreports**: Generated market research reports with comprehensive analysis data
 
 ## Security Features
-- Replit OAuth integration with OpenID Connect
-- Session-based authentication with PostgreSQL session store
-- Protected API routes with authentication middleware
+- Google OAuth integration with Passport.js
+- JWT-based authentication with httpOnly cookies
+- Protected API routes with comprehensive authentication middleware
+- Password hashing with bcrypt for local accounts
 - Secure environment variable management
 
 ## Technical Stack
 - **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, wouter routing, TanStack Query
-- **Backend**: Express.js, TypeScript, Passport.js, OpenID Client
-- **Database**: PostgreSQL, Drizzle ORM, connection pooling
+- **Backend**: Express.js, TypeScript, Passport.js, JWT, bcrypt
+- **Database**: MongoDB, Mongoose ODM, connection pooling
 - **Development**: ESBuild, Hot reload, TypeScript compilation

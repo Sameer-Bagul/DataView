@@ -1,36 +1,61 @@
 import type { Express } from "express";
+import express from 'express';
+import session from 'express-session';
+import cookieParser from 'cookie-parser';
+import passport from './auth/oauth';
+import { AuthController } from './controllers/authController';
+import { ReportController } from './controllers/reportController';
+import { authenticateToken, optionalAuth } from './auth/jwt';
 import { createServer, type Server } from "http";
-import { setupAuth, isAuthenticated } from "./auth/replitAuth";
-import { AuthController } from "./controllers/authController";
-import { ReportController } from "./controllers/reportController";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
+  // Middleware
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
+  
+  // Session configuration for OAuth
+  app.use(session({
+    secret: process.env.JWT_SECRET || 'dev-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+  }));
+
+  // Passport middleware
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  // Auth controller instance
+  const authController = new AuthController();
 
   // Auth routes
-  app.get('/api/auth/user', isAuthenticated, AuthController.getUser);
+  app.post('/api/auth/login', authController.login);
+  app.post('/api/auth/register', authController.register);
+  app.post('/api/auth/logout', authController.logout);
+  app.get('/api/auth/user', authenticateToken, authController.getCurrentUser);
 
-  // Report generation routes
-  app.post("/api/reports/generate", ReportController.generateReport);
+  // OAuth routes
+  app.get('/api/auth/oauth/google', 
+    passport.authenticate('google', { scope: ['profile', 'email'] })
+  );
   
-  // Webhook endpoints
-  app.post("/api/webhook/n8n", ReportController.handleN8nWebhook);
-  app.post("/api/webhook/market-research", ReportController.handleMarketResearchWebhook);
+  app.get('/api/auth/oauth/callback',
+    passport.authenticate('google', { failureRedirect: '/login' }),
+    authController.oauthCallback
+  );
 
-  // Market report CRUD routes
-  app.get("/api/market-reports", ReportController.getAllReports);
-  app.get("/api/market-reports/:id", ReportController.getReportById);
-  app.get("/api/market-reports/industry/:industry", ReportController.getReportsByIndustry);
-  app.get("/api/market-reports/region/:region", ReportController.getReportsByRegion);
-  app.post("/api/market-reports", ReportController.createReport);
-  app.patch("/api/market-reports/:id", ReportController.updateReport);
-  app.delete("/api/market-reports/:id", ReportController.deleteReport);
+  // Report routes (protected)
+  app.post('/api/reports/generate', authenticateToken, ReportController.generateReport);
+  app.get('/api/reports', authenticateToken, ReportController.getReports);
+  app.get('/api/reports/:id', authenticateToken, ReportController.getReport);
 
-  // Protected route example
-  app.get("/api/protected", isAuthenticated, async (req: any, res) => {
-    const userId = req.user?.claims?.sub;
-    res.json({ message: "This is a protected route", userId });
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
   const httpServer = createServer(app);

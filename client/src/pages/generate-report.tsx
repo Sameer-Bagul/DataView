@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { reportGenerationSchema, type ReportGenerationData } from "@shared/schema";
+import { generateReportSchema, type GenerateReportData } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { ArrowLeft, Sparkles } from "lucide-react";
 import { Link } from "wouter";
@@ -18,21 +18,21 @@ export default function GenerateReport() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const form = useForm<ReportGenerationData>({
-    resolver: zodResolver(reportGenerationSchema),
+  const form = useForm<GenerateReportData>({
+    resolver: zodResolver(generateReportSchema),
     defaultValues: {
-      "Industry Name": "",
-      "Your Company Type": "Individual",
-      "Report Study Scope": "Global",
-      "Region name (if Regional report)": "",
-      "formMode": "production",
+      industryName: "",
+      companyType: "Individual",
+      reportScope: "Global",
+      region: "",
+      formMode: "basic",
     },
   });
 
-  const watchReportScope = form.watch("Report Study Scope");
+  const watchReportScope = form.watch("reportScope");
 
   const generateMutation = useMutation({
-    mutationFn: (data: ReportGenerationData) => apiRequest("/api/reports/generate", {
+    mutationFn: (data: GenerateReportData) => apiRequest("/api/reports/generate", {
       method: "POST",
       body: JSON.stringify(data),
     }),
@@ -53,7 +53,7 @@ export default function GenerateReport() {
     },
   });
 
-  const onSubmit = (data: ReportGenerationData) => {
+  const onSubmit = (data: GenerateReportData) => {
     generateMutation.mutate(data);
   };
 

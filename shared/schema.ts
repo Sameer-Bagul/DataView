@@ -1,181 +1,219 @@
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, timestamp, integer, boolean, index } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+import { z } from 'zod';
+import mongoose, { Schema, Document } from 'mongoose';
 
-// Session storage table for Replit Auth
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
-
-// User storage table for Replit Auth
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
+// MongoDB User Schema
+export const userSchema = z.object({
+  _id: z.string().optional(),
+  id: z.string(),
+  email: z.string().email(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  profileImageUrl: z.string().optional(),
+  password: z.string().optional(),
+  oauthProvider: z.string().optional(),
+  oauthId: z.string().optional(),
+  createdAt: z.date().default(() => new Date()),
+  updatedAt: z.date().default(() => new Date()),
 });
 
-export const reportRequests = pgTable("report_requests", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").references(() => users.id).notNull(),
-  industryName: text("industry_name").notNull(),
-  companyType: text("company_type").notNull(),
-  reportScope: text("report_scope").notNull(),
-  region: text("region"),
-  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
-  submittedAt: timestamp("submitted_at").notNull(),
-  formMode: text("form_mode"),
-  createdAt: timestamp("created_at").default(sql`now()`),
+export type User = z.infer<typeof userSchema>;
+export type UpsertUser = Omit<User, '_id' | 'createdAt' | 'updatedAt'>;
+
+// Login schema for authentication
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
 });
 
-export const marketReports = pgTable("market_reports", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  requestId: varchar("request_id").references(() => reportRequests.id),
-  userId: varchar("user_id").references(() => users.id),
-  industryName: text("industry_name").notNull(),
-  companyType: text("company_type").notNull(),
-  reportScope: text("report_scope").notNull(),
-  region: text("region"),
-  submittedAt: timestamp("submitted_at").notNull(),
-  formMode: text("form_mode"),
-  executiveSummary: jsonb("executive_summary"),
-  marketIntroduction: jsonb("market_introduction"),
-  marketDynamics: jsonb("market_dynamics"),
-  marketGrowthTrends: jsonb("market_growth_trends"),
-  marketSegmentation: jsonb("market_segmentation"),
-  competitorAnalysis: jsonb("competitor_analysis"),
-  createdAt: timestamp("created_at").default(sql`now()`),
+export type LoginData = z.infer<typeof loginSchema>;
+
+// Report Request Schema
+export const reportRequestSchema = z.object({
+  _id: z.string().optional(),
+  id: z.string(),
+  userId: z.string(),
+  industryName: z.string(),
+  companyType: z.string(),
+  reportScope: z.string(),
+  region: z.string().optional(),
+  status: z.enum(['pending', 'processing', 'completed', 'failed']).default('pending'),
+  submittedAt: z.date(),
+  formMode: z.string().optional(),
+  createdAt: z.date().default(() => new Date()),
 });
 
-// Zod schemas for validation
-export const executiveSummarySchema = z.object({
-  marketAttractiveness: z.string(),
-  historicalAnalysis: z.string(),
-  futureProjections: z.string(),
-  keyFindings: z.array(z.string()),
+export type ReportRequest = z.infer<typeof reportRequestSchema>;
+export type InsertReportRequest = Omit<ReportRequest, '_id' | 'createdAt'>;
+
+// Market Report Schema
+export const marketReportSchema = z.object({
+  _id: z.string().optional(),
+  id: z.string(),
+  requestId: z.string().optional(),
+  userId: z.string(),
+  industryName: z.string(),
+  companyType: z.string(),
+  reportScope: z.string(),
+  region: z.string().optional(),
+  submittedAt: z.date(),
+  formMode: z.string().optional(),
+  executiveSummary: z.object({
+    marketAttractiveness: z.string(),
+    historicalAnalysis: z.string(),
+    futureProjections: z.string(),
+    keyFindings: z.array(z.string()),
+  }).optional(),
+  marketIntroduction: z.object({
+    overview: z.string(),
+    keyPlayers: z.array(z.string()),
+    marketSize: z.string(),
+    geographicScope: z.string(),
+  }).optional(),
+  marketDynamics: z.object({
+    drivers: z.array(z.string()),
+    restraints: z.array(z.string()),
+    opportunities: z.array(z.string()),
+    challenges: z.array(z.string()),
+  }).optional(),
+  marketGrowthTrends: z.object({
+    historicalGrowth: z.string(),
+    currentTrends: z.array(z.string()),
+    futureProjections: z.string(),
+    cagr: z.string(),
+  }).optional(),
+  marketSegmentation: z.object({
+    byProduct: z.array(z.string()),
+    byApplication: z.array(z.string()),
+    byRegion: z.array(z.string()),
+    byEndUser: z.array(z.string()),
+  }).optional(),
+  competitorAnalysis: z.object({
+    majorPlayers: z.array(z.string()),
+    marketShares: z.array(z.string()),
+    competitiveStrategies: z.array(z.string()),
+    swotAnalysis: z.string(),
+  }).optional(),
+  createdAt: z.date().default(() => new Date()),
 });
 
-export const marketDynamicsSchema = z.object({
-  drivers: z.array(z.string()),
-  restraints: z.array(z.string()),
-  opportunities: z.array(z.string()),
-  challenges: z.array(z.string()),
+export type MarketReport = z.infer<typeof marketReportSchema>;
+export type InsertMarketReport = Omit<MarketReport, '_id' | 'createdAt'>;
+
+// Generate Report Request Schema
+export const generateReportSchema = z.object({
+  industryName: z.string().min(1, "Industry name is required"),
+  companyType: z.string().min(1, "Company type is required"),
+  reportScope: z.string().min(1, "Report scope is required"),
+  region: z.string().optional(),
+  formMode: z.enum(['basic', 'advanced']).default('basic'),
 });
 
-export const swotAnalysisSchema = z.object({
-  strengths: z.string(),
-  weaknesses: z.string(),
-  opportunities: z.string(),
-  threats: z.string(),
+export type GenerateReportData = z.infer<typeof generateReportSchema>;
+
+// Mongoose Models
+export interface IUser extends Document {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+  password?: string;
+  oauthProvider?: string;
+  oauthId?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface IReportRequest extends Document {
+  id: string;
+  userId: string;
+  industryName: string;
+  companyType: string;
+  reportScope: string;
+  region?: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  submittedAt: Date;
+  formMode?: string;
+  createdAt: Date;
+}
+
+export interface IMarketReport extends Document {
+  id: string;
+  requestId?: string;
+  userId: string;
+  industryName: string;
+  companyType: string;
+  reportScope: string;
+  region?: string;
+  submittedAt: Date;
+  formMode?: string;
+  executiveSummary?: any;
+  marketIntroduction?: any;
+  marketDynamics?: any;
+  marketGrowthTrends?: any;
+  marketSegmentation?: any;
+  competitorAnalysis?: any;
+  createdAt: Date;
+}
+
+// MongoDB Schemas
+const UserMongooseSchema = new Schema<IUser>({
+  id: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true },
+  firstName: { type: String },
+  lastName: { type: String },
+  profileImageUrl: { type: String },
+  password: { type: String },
+  oauthProvider: { type: String },
+  oauthId: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 });
 
-export const pestelAnalysisSchema = z.object({
-  political: z.string(),
-  economic: z.string(),
-  social: z.string(),
-  technological: z.string(),
-  environmental: z.string(),
-  legal: z.string(),
+const ReportRequestMongooseSchema = new Schema<IReportRequest>({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true },
+  industryName: { type: String, required: true },
+  companyType: { type: String, required: true },
+  reportScope: { type: String, required: true },
+  region: { type: String },
+  status: { type: String, enum: ['pending', 'processing', 'completed', 'failed'], default: 'pending' },
+  submittedAt: { type: Date, required: true },
+  formMode: { type: String },
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const porterAnalysisSchema = z.object({
-  competitiveRivalry: z.string(),
-  supplierPower: z.string(),
-  buyerPower: z.string(),
-  threatOfSubstitution: z.string(),
-  threatOfNewEntrants: z.string(),
+const MarketReportMongooseSchema = new Schema<IMarketReport>({
+  id: { type: String, required: true, unique: true },
+  requestId: { type: String },
+  userId: { type: String, required: true },
+  industryName: { type: String, required: true },
+  companyType: { type: String, required: true },
+  reportScope: { type: String, required: true },
+  region: { type: String },
+  submittedAt: { type: Date, required: true },
+  formMode: { type: String },
+  executiveSummary: { type: Schema.Types.Mixed },
+  marketIntroduction: { type: Schema.Types.Mixed },
+  marketDynamics: { type: Schema.Types.Mixed },
+  marketGrowthTrends: { type: Schema.Types.Mixed },
+  marketSegmentation: { type: Schema.Types.Mixed },
+  competitorAnalysis: { type: Schema.Types.Mixed },
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const marketGrowthTrendsSchema = z.object({
-  swotAnalysis: swotAnalysisSchema,
-  pestelAnalysis: pestelAnalysisSchema,
-  porterAnalysis: porterAnalysisSchema,
-});
+// Export Models (declare conditional to avoid re-compilation issues)
+let UserModel: any;
+let ReportRequestModel: any;
+let MarketReportModel: any;
 
-export const marketSegmentationSchema = z.object({
-  byProductType: z.record(z.string()),
-  byApplication: z.record(z.string()),
-  byRegion: z.record(z.string()),
-  marketSize: z.record(z.number()),
-});
+try {
+  UserModel = mongoose.models.User || mongoose.model<IUser>('User', UserMongooseSchema);
+  ReportRequestModel = mongoose.models.ReportRequest || mongoose.model<IReportRequest>('ReportRequest', ReportRequestMongooseSchema);
+  MarketReportModel = mongoose.models.MarketReport || mongoose.model<IMarketReport>('MarketReport', MarketReportMongooseSchema);
+} catch (error) {
+  // Models may not be available on client-side
+  console.log('Models not available in this environment');
+}
 
-export const competitorSchema = z.object({
-  name: z.string(),
-  overview: z.string(),
-  products: z.array(z.string()),
-  financials: z.string(),
-  swot: z.object({
-    strengths: z.string(),
-    weaknesses: z.string(),
-    opportunities: z.string(),
-    threats: z.string(),
-  }),
-  strategies: z.array(z.string()),
-});
-
-export const marketIntroductionSchema = z.object({
-  definition: z.string(),
-  scope: z.string(),
-  marketStructure: z.string(),
-  macroFactors: z.array(z.string()),
-});
-
-export const insertMarketReportSchema = createInsertSchema(marketReports).extend({
-  executiveSummary: executiveSummarySchema.optional(),
-  marketIntroduction: marketIntroductionSchema.optional(),
-  marketDynamics: marketDynamicsSchema.optional(),
-  marketGrowthTrends: marketGrowthTrendsSchema.optional(),
-  marketSegmentation: marketSegmentationSchema.optional(),
-  competitorAnalysis: z.array(competitorSchema).optional(),
-});
-
-export const upsertUserSchema = createInsertSchema(users).omit({ createdAt: true, updatedAt: true });
-export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
-
-export const insertReportRequestSchema = createInsertSchema(reportRequests).omit({ 
-  id: true, 
-  createdAt: true, 
-  status: true 
-});
-
-export const reportGenerationSchema = z.object({
-  "Industry Name": z.string().min(1, "Industry name is required"),
-  "Your Company Type": z.enum(["Individual", "Corporate", "Startup", "SME"]),
-  "Report Study Scope": z.enum(["Global", "Regional", "Locality Specific"]),
-  "Region name (if Regional report)": z.string().optional(),
-  "formMode": z.enum(["test", "production"]).optional().default("production"),
-});
-
-export const n8nWebhookSchema = z.object({
-  "Industry Name": z.string(),
-  "Your Company Type": z.string(),
-  "Report Study Scope": z.string(),
-  "Region name (if Regional report)": z.string().optional(),
-  "submittedAt": z.string(),
-  "formMode": z.string().optional(),
-});
-
-export type User = typeof users.$inferSelect;
-export type UpsertUser = z.infer<typeof upsertUserSchema>;
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type ReportRequest = typeof reportRequests.$inferSelect;
-export type InsertReportRequest = z.infer<typeof insertReportRequestSchema>;
-export type ReportGenerationData = z.infer<typeof reportGenerationSchema>;
-export type InsertMarketReport = z.infer<typeof insertMarketReportSchema>;
-export type MarketReport = typeof marketReports.$inferSelect;
-export type ExecutiveSummary = z.infer<typeof executiveSummarySchema>;
-export type MarketDynamics = z.infer<typeof marketDynamicsSchema>;
-export type MarketGrowthTrends = z.infer<typeof marketGrowthTrendsSchema>;
-export type MarketSegmentation = z.infer<typeof marketSegmentationSchema>;
-export type Competitor = z.infer<typeof competitorSchema>;
-export type N8nWebhookData = z.infer<typeof n8nWebhookSchema>;
+export { UserModel, ReportRequestModel, MarketReportModel };

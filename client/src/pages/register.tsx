@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { loginSchema, type LoginData } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-export default function Login() {
+export default function Register() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -23,44 +23,44 @@ export default function Login() {
     },
   });
 
-  const loginMutation = useMutation({
-    mutationFn: (data: LoginData) => apiRequest("/api/auth/login", {
+  const registerMutation = useMutation({
+    mutationFn: (data: LoginData) => apiRequest("/api/auth/register", {
       method: "POST",
       body: JSON.stringify(data),
     }),
     onSuccess: () => {
       toast({
-        title: "Login successful",
-        description: "Welcome back!",
+        title: "Registration successful",
+        description: "Welcome to Market Insights Platform!",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       setLocation("/");
     },
     onError: (error: any) => {
       toast({
-        title: "Login failed", 
-        description: error.message || "Invalid email or password",
+        title: "Registration failed", 
+        description: error.message || "Unable to create account",
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: LoginData) => {
-    loginMutation.mutate(data);
+    registerMutation.mutate(data);
   };
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold" data-testid="text-login-title">Market Insights Platform</CardTitle>
-          <CardDescription data-testid="text-login-description">
-            Sign in to access your market research reports
+          <CardTitle className="text-2xl font-bold" data-testid="text-register-title">Create Account</CardTitle>
+          <CardDescription data-testid="text-register-description">
+            Join Market Insights Platform to access professional market research
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" data-testid="form-login">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" data-testid="form-register">
               <FormField
                 control={form.control}
                 name="email"
@@ -88,7 +88,7 @@ export default function Login() {
                     <FormControl>
                       <Input
                         type="password"
-                        placeholder="Enter your password"
+                        placeholder="Create a password (minimum 6 characters)"
                         {...field}
                         data-testid="input-password"
                       />
@@ -100,22 +100,22 @@ export default function Login() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={loginMutation.isPending}
-                data-testid="button-login"
+                disabled={registerMutation.isPending}
+                data-testid="button-register"
               >
-                {loginMutation.isPending ? "Signing in..." : "Sign In"}
+                {registerMutation.isPending ? "Creating Account..." : "Create Account"}
               </Button>
             </form>
           </Form>
           
-          {/* OAuth Login */}
+          {/* OAuth Registration */}
           <div className="mt-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                <span className="bg-background px-2 text-muted-foreground">Or sign up with</span>
               </div>
             </div>
             <Button
@@ -142,15 +142,15 @@ export default function Login() {
                   d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                 />
               </svg>
-              Sign in with Google
+              Sign up with Google
             </Button>
           </div>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Don't have an account?{" "}
-              <Link href="/register" className="text-primary hover:underline" data-testid="link-register">
-                Sign up
+              Already have an account?{" "}
+              <Link href="/login" className="text-primary hover:underline" data-testid="link-login">
+                Sign in
               </Link>
             </p>
           </div>

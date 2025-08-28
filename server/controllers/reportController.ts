@@ -1,45 +1,80 @@
 import type { Request, Response } from "express";
 import { storage } from "../storage";
-import { insertMarketReportSchema, n8nWebhookSchema, reportGenerationSchema } from "@shared/schema";
-import { fromError } from "zod-validation-error";
+import { generateReportSchema, type GenerateReportData } from "@shared/schema";
+import { randomUUID } from 'crypto';
 
 export class ReportController {
   static async generateReport(req: Request, res: Response) {
     try {
-      const validatedData = reportGenerationSchema.parse(req.body);
-      
-      // Use demo user or any existing user for report generation
-      let demoUser = await storage.getUserByEmail("demo@example.com");
-      if (!demoUser) {
-        // Create demo user if doesn't exist
-        demoUser = await storage.upsertUser({
-          id: "demo-user",
-          email: "demo@example.com",
-          firstName: "Demo",
-          lastName: "User",
-        });
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
       }
+
+      const validatedData = generateReportSchema.parse(req.body);
       
       // Create report request
       const reportRequest = await storage.createReportRequest({
-        userId: demoUser.id,
-        industryName: validatedData["Industry Name"],
-        companyType: validatedData["Your Company Type"],
-        reportScope: validatedData["Report Study Scope"],
-        region: validatedData["Region name (if Regional report)"] || null,
+        id: randomUUID(),
+        userId: user.id,
+        industryName: validatedData.industryName,
+        companyType: validatedData.companyType,
+        reportScope: validatedData.reportScope,
+        region: validatedData.region,
         submittedAt: new Date(),
-        formMode: validatedData.formMode || "production",
+        formMode: validatedData.formMode,
+        status: 'pending',
       });
       
       // In a real app, this would trigger AI report generation
-      // For demo, we'll just simulate the process
+      // For demo, we'll simulate the process
       console.log("Report generation requested:", reportRequest.id);
       
       res.json({ success: true, requestId: reportRequest.id });
     } catch (error) {
       console.error("Error generating report:", error);
-      // Always return success for demo purposes
-      res.json({ success: true, requestId: "demo-" + Date.now() });
+      res.status(500).json({ message: 'Failed to generate report' });
+    }
+  }
+
+  static async getReports(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const reports = await storage.getMarketReportsByUserId(user.id);
+      res.json(reports);
+    } catch (error) {
+      console.error("Error fetching reports:", error);
+      res.status(500).json({ message: 'Failed to fetch reports' });
+    }
+  }
+
+  static async getReport(req: Request, res: Response) {
+    try {
+      const user = (req as any).user;
+      if (!user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+
+      const reportId = req.params.id;
+      const report = await storage.getMarketReport(reportId);
+      
+      if (!report) {
+        return res.status(404).json({ message: 'Report not found' });
+      }
+
+      // Check if user owns this report
+      if (report.userId !== user.id) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      res.json(report);
+    } catch (error) {
+      console.error("Error fetching report:", error);
+      res.status(500).json({ message: 'Failed to fetch report' });
     }
   }
 
