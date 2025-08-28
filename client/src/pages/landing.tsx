@@ -12,7 +12,7 @@ export default function Landing() {
             <BarChart3 className="h-8 w-8 text-primary" />
             <h1 className="text-2xl font-bold">Market Insights Platform</h1>
           </div>
-          <Button onClick={() => window.location.href = "/api/login"} data-testid="button-login">
+          <Button onClick={() => window.location.href = "/login"} data-testid="button-login">
             Sign In
           </Button>
         </div>
@@ -30,7 +30,7 @@ export default function Landing() {
         <div className="flex gap-4 justify-center">
           <Button 
             size="lg" 
-            onClick={() => window.location.href = "/api/login"}
+            onClick={() => window.location.href = "/login"}
             data-testid="button-get-started"
           >
             Get Started
@@ -115,7 +115,7 @@ export default function Landing() {
             <Button 
               size="lg" 
               className="w-full max-w-md"
-              onClick={() => window.location.href = "/api/login"}
+              onClick={() => window.location.href = "/login"}
               data-testid="button-start-now"
             >
               Start Your Market Research Now
