@@ -1,9 +1,22 @@
-import { type MarketReport, type InsertMarketReport } from "@shared/schema";
+import { type MarketReport, type InsertMarketReport, type User, type InsertUser, type ReportRequest, type InsertReportRequest } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
+  // User methods
+  getUserById(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  
+  // Report request methods
+  getReportRequest(id: string): Promise<ReportRequest | undefined>;
+  getReportRequestsByUserId(userId: string): Promise<ReportRequest[]>;
+  createReportRequest(request: InsertReportRequest): Promise<ReportRequest>;
+  updateReportRequestStatus(id: string, status: string): Promise<ReportRequest | undefined>;
+  
+  // Market report methods
   getMarketReport(id: string): Promise<MarketReport | undefined>;
   getAllMarketReports(): Promise<MarketReport[]>;
+  getMarketReportsByUserId(userId: string): Promise<MarketReport[]>;
   getMarketReportsByIndustry(industry: string): Promise<MarketReport[]>;
   getMarketReportsByRegion(region: string): Promise<MarketReport[]>;
   createMarketReport(report: InsertMarketReport): Promise<MarketReport>;
@@ -12,17 +25,87 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
+  private users: Map<string, User>;
+  private reportRequests: Map<string, ReportRequest>;
   private marketReports: Map<string, MarketReport>;
 
   constructor() {
+    this.users = new Map();
+    this.reportRequests = new Map();
     this.marketReports = new Map();
     this.initializeSampleData();
   }
 
+  // User methods
+  async getUserById(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(user => user.email === email);
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const now = new Date();
+    const user: User = {
+      ...insertUser,
+      id,
+      createdAt: now,
+    };
+    this.users.set(id, user);
+    return user;
+  }
+
+  // Report request methods
+  async getReportRequest(id: string): Promise<ReportRequest | undefined> {
+    return this.reportRequests.get(id);
+  }
+
+  async getReportRequestsByUserId(userId: string): Promise<ReportRequest[]> {
+    return Array.from(this.reportRequests.values()).filter(
+      (request) => request.userId === userId
+    ).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }
+
+  async createReportRequest(insertRequest: InsertReportRequest): Promise<ReportRequest> {
+    const id = randomUUID();
+    const now = new Date();
+    const request: ReportRequest = {
+      ...insertRequest,
+      id,
+      status: "pending",
+      createdAt: now,
+    };
+    this.reportRequests.set(id, request);
+    return request;
+  }
+
+  async updateReportRequestStatus(id: string, status: string): Promise<ReportRequest | undefined> {
+    const existing = this.reportRequests.get(id);
+    if (!existing) return undefined;
+    
+    const updated = { ...existing, status };
+    this.reportRequests.set(id, updated);
+    return updated;
+  }
+
   private async initializeSampleData() {
+    // Create a demo user
+    const demoUser: User = {
+      id: randomUUID(),
+      email: "demo@example.com",
+      password: "password123", // In real app, this would be hashed
+      name: "Demo User",
+      createdAt: new Date(),
+    };
+    this.users.set(demoUser.id, demoUser);
+
     // Add the hair salon market research sample data
     const sampleReport: MarketReport = {
       id: randomUUID(),
+      requestId: null,
+      userId: demoUser.id,
       industryName: "Hair Salon",
       companyType: "Individual", 
       reportScope: "Locality Specific",
@@ -224,6 +307,12 @@ export class MemStorage implements IStorage {
     );
   }
 
+  async getMarketReportsByUserId(userId: string): Promise<MarketReport[]> {
+    return Array.from(this.marketReports.values()).filter(
+      (report) => report.userId === userId
+    ).sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }
+
   async getMarketReportsByIndustry(industry: string): Promise<MarketReport[]> {
     return Array.from(this.marketReports.values()).filter(
       (report) => report.industryName.toLowerCase().includes(industry.toLowerCase())
@@ -245,6 +334,8 @@ export class MemStorage implements IStorage {
       createdAt: now,
       submittedAt: insertReport.submittedAt || now,
       region: insertReport.region || null,
+      requestId: insertReport.requestId || null,
+      userId: insertReport.userId || null,
     };
     this.marketReports.set(id, report);
     return report;

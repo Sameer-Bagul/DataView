@@ -1,10 +1,109 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertMarketReportSchema, n8nWebhookSchema } from "@shared/schema";
+import { insertMarketReportSchema, n8nWebhookSchema, insertUserSchema, loginSchema, reportGenerationSchema } from "@shared/schema";
 import { fromError } from "zod-validation-error";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+
+  // Authentication routes
+  app.post("/api/auth/signup", async (req: Request, res: Response) => {
+    try {
+      const validatedData = insertUserSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(validatedData.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "User already exists with this email" });
+      }
+      
+      const user = await storage.createUser(validatedData);
+      // Remove password from response
+      const { password, ...userWithoutPassword } = user;
+      
+      res.status(201).json({ success: true, user: userWithoutPassword });
+    } catch (error) {
+      console.error("Error creating user:", error);
+      if (error instanceof Error) {
+        const validationError = fromError(error);
+        res.status(400).json({ 
+          error: "Invalid user data", 
+          details: validationError.toString() 
+        });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const validatedData = loginSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(validatedData.email);
+      if (!user || user.password !== validatedData.password) {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+      
+      // Remove password from response
+      const { password, ...userWithoutPassword } = user;
+      
+      res.json({ success: true, user: userWithoutPassword });
+    } catch (error) {
+      console.error("Error logging in:", error);
+      if (error instanceof Error) {
+        const validationError = fromError(error);
+        res.status(400).json({ 
+          error: "Invalid login data", 
+          details: validationError.toString() 
+        });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+
+  // Report generation routes  
+  app.post("/api/reports/generate", async (req: Request, res: Response) => {
+    try {
+      const validatedData = reportGenerationSchema.parse(req.body);
+      
+      // In a real app, you'd get userId from authenticated session
+      // For now, we'll use a demo user or create one
+      const demoUser = await storage.getUserByEmail("demo@example.com");
+      if (!demoUser) {
+        return res.status(401).json({ error: "User not found" });
+      }
+      
+      // Create report request
+      const reportRequest = await storage.createReportRequest({
+        userId: demoUser.id,
+        industryName: validatedData["Industry Name"],
+        companyType: validatedData["Your Company Type"],
+        reportScope: validatedData["Report Study Scope"],
+        region: validatedData["Region name (if Regional report)"] || null,
+        submittedAt: new Date(),
+        formMode: validatedData.formMode || "production",
+      });
+      
+      // In a real app, this would trigger AI report generation
+      // For demo, we'll just simulate the process
+      console.log("Report generation requested:", reportRequest.id);
+      
+      res.json({ success: true, requestId: reportRequest.id });
+    } catch (error) {
+      console.error("Error generating report:", error);
+      if (error instanceof Error) {
+        const validationError = fromError(error);
+        res.status(400).json({ 
+          error: "Invalid report request", 
+          details: validationError.toString() 
+        });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
   
   // Webhook endpoint for receiving data from n8n
   app.post("/api/webhook/n8n", async (req: Request, res: Response) => {
@@ -106,10 +205,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get all market reports
+  // Get all market reports or user-specific reports  
   app.get("/api/market-reports", async (req: Request, res: Response) => {
     try {
-      const reports = await storage.getAllMarketReports();
+      const { userId } = req.query;
+      
+      let reports;
+      if (userId && typeof userId === 'string') {
+        reports = await storage.getMarketReportsByUserId(userId);
+      } else {
+        reports = await storage.getAllMarketReports();
+      }
+      
       res.json(reports);
     } catch (error) {
       console.error("Error fetching market reports:", error);

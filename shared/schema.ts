@@ -1,10 +1,33 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, jsonb, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, jsonb, timestamp, integer, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull().unique(),
+  password: text("password").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").default(sql`now()`),
+});
+
+export const reportRequests = pgTable("report_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id).notNull(),
+  industryName: text("industry_name").notNull(),
+  companyType: text("company_type").notNull(),
+  reportScope: text("report_scope").notNull(),
+  region: text("region"),
+  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
+  submittedAt: timestamp("submitted_at").notNull(),
+  formMode: text("form_mode"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+});
+
 export const marketReports = pgTable("market_reports", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  requestId: varchar("request_id").references(() => reportRequests.id),
+  userId: varchar("user_id").references(() => users.id),
   industryName: text("industry_name").notNull(),
   companyType: text("company_type").notNull(),
   reportScope: text("report_scope").notNull(),
@@ -102,6 +125,26 @@ export const insertMarketReportSchema = createInsertSchema(marketReports).extend
   competitorAnalysis: z.array(competitorSchema).optional(),
 });
 
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
+
+export const insertReportRequestSchema = createInsertSchema(reportRequests).omit({ 
+  id: true, 
+  createdAt: true, 
+  status: true 
+});
+
+export const reportGenerationSchema = z.object({
+  "Industry Name": z.string().min(1, "Industry name is required"),
+  "Your Company Type": z.enum(["Individual", "Corporate", "Startup", "SME"]),
+  "Report Study Scope": z.enum(["Global", "Regional", "Locality Specific"]),
+  "Region name (if Regional report)": z.string().optional(),
+  "formMode": z.enum(["test", "production"]).optional().default("production"),
+});
+
 export const n8nWebhookSchema = z.object({
   "Industry Name": z.string(),
   "Your Company Type": z.string(),
@@ -111,6 +154,12 @@ export const n8nWebhookSchema = z.object({
   "formMode": z.string().optional(),
 });
 
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type LoginData = z.infer<typeof loginSchema>;
+export type ReportRequest = typeof reportRequests.$inferSelect;
+export type InsertReportRequest = z.infer<typeof insertReportRequestSchema>;
+export type ReportGenerationData = z.infer<typeof reportGenerationSchema>;
 export type InsertMarketReport = z.infer<typeof insertMarketReportSchema>;
 export type MarketReport = typeof marketReports.$inferSelect;
 export type ExecutiveSummary = z.infer<typeof executiveSummarySchema>;
